@@ -1,0 +1,715 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { 
+  ShieldCheck, 
+  Cpu, 
+  X,
+  Compass,
+  MessageSquare,
+  Users,
+  History,
+  User,
+  Settings as SettingsIcon,
+  Bell
+} from "lucide-react";
+import { UserProfile, Friend, LiveNotification, Room, HistoryItem } from "@/lib/types";
+import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
+
+// Core View Imports
+import DashboardView from "@/components/DashboardView";
+import ChatView from "@/components/ChatView";
+import RoomsView from "@/components/RoomsView";
+import FriendsView from "@/components/FriendsView";
+import HistoryView from "@/components/HistoryView";
+import ProfileView from "@/components/ProfileView";
+import SettingsView from "@/components/SettingsView";
+import NotificationsView from "@/components/NotificationsView";
+import AuthGateway from "@/components/AuthGateway";
+
+// Modals
+import AddFriendModal from "@/components/Shared/AddFriendModal";
+import PremiumModal from "@/components/Shared/PremiumModal";
+import PremiumLogo from "@/components/Shared/PremiumLogo";
+
+const getNowTimestamp = () => Date.now();
+
+export default function Page() {
+  const [isReady, setIsReady] = useState(false);
+  const [currentView, setCurrentView] = useState<string>("dashboard");
+  const [bootStep, setBootStep] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Modern Dark/Light Theme State
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  // Core Persisted States
+  const [profile, setProfile] = useState<UserProfile>({
+    id: "",
+    username: "@stranger_0000",
+    displayName: "Anonymous Stranger",
+    bio: "Connected & verified on Flux Meet.",
+    country: "🌍 Worldwide",
+    age: 18,
+    avatar: null,
+    verified: true,
+    memberType: "Free",
+    chatsCount: 0,
+    messagesCount: 0,
+    friendsCount: 3,
+    rating: 4.9,
+  });
+
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [notifications, setNotifications] = useState<LiveNotification[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [settings, setSettings] = useState({
+    audioEnabled: true,
+    streamstats: true,
+    telemetryLogging: true,
+  });
+
+  // Server counters & metrics
+  const [onlineUsers, setOnlineUsers] = useState(1428);
+  const [chatsToday, setChatsToday] = useState(894);
+  const [countriesCount, setCountriesCount] = useState(114);
+  const [messagesSent, setMessagesSent] = useState(24890);
+
+  // Modals Core Toggle
+  const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
+  const [isPremiumOpen, setIsPremiumOpen] = useState(false);
+
+  // Toast notification alerts state
+  const [toasts, setToasts] = useState<{ id: string; msg: string; type: "success" | "info" | "error" }[]>([]);
+
+  // Telemetry APIs
+  async function fetchRooms() {
+    try {
+      const res = await fetch("/api/rooms");
+      const data = await res.json();
+      if (data.success) {
+        setRooms(data.rooms);
+      }
+    } catch (e) {
+      console.error("Rooms fetch error:", e);
+    }
+  }
+
+  async function fetchStats() {
+    try {
+      const res = await fetch("/api/stats");
+      const data = await res.json();
+      if (data.success) {
+        setOnlineUsers(data.onlineUsers);
+        setChatsToday(data.chatsToday);
+        setCountriesCount(data.countriesCount);
+        setMessagesSent(data.messagesSentCount);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Load and cycle through progress triggers during modern 3.2 second loader duration
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setBootStep(prev => {
+        if (prev >= 4) {
+          clearInterval(timer);
+          return 4;
+        }
+        return prev + 1;
+      });
+    }, 750);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Safe De-serialization from LocalStorage inside animation frames to avoid SSR differences
+  useEffect(() => {
+    // Theme restore
+    const savedTheme = localStorage.getItem("fm_theme") as "dark" | "light";
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+
+    if (bootStep < 4) return;
+
+    const frameId = requestAnimationFrame(() => {
+      // Create random user identity hash
+      let localUid = localStorage.getItem("fm_uid");
+      if (!localUid) {
+        localUid = `u_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem("fm_uid", localUid);
+      }
+
+      // Restore authentication state
+      const localAuth = localStorage.getItem("fm_authenticated") === "true";
+      setIsAuthenticated(localAuth);
+
+      // Restore User Profile
+      const localProf = localStorage.getItem("fm_profile");
+      if (localProf) {
+        try {
+          setProfile(JSON.parse(localProf));
+        } catch (e) {
+          console.error("Profile cache error:", e);
+        }
+      } else {
+        const defaultProf: UserProfile = {
+          id: localUid,
+          username: `@stranger_${localUid.slice(-4)}`,
+          displayName: "Anonymous Stranger",
+          bio: "Connected & verified on Flux Meet protocol.",
+          country: "🌍 Worldwide",
+          age: 18,
+          avatar: null,
+          verified: true,
+          memberType: "Free",
+          chatsCount: 0,
+          messagesCount: 0,
+          friendsCount: 3,
+          rating: 4.9,
+        };
+        setProfile(defaultProf);
+        localStorage.setItem("fm_profile", JSON.stringify(defaultProf));
+      }
+
+      // Restore Preferences settings
+      const localSett = localStorage.getItem("fm_settings");
+      if (localSett) {
+        try {
+          setSettings(JSON.parse(localSett));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Restore Contacts List
+      const localFriends = localStorage.getItem("fm_friends");
+      if (localFriends) {
+        try {
+          setFriends(JSON.parse(localFriends));
+        } catch (e) {}
+      } else {
+        const defaultFriends: Friend[] = [
+          { id: "f1", username: "@alex_m", displayName: "Alex M.", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=80&h=80&q=80", online: true, country: "🇺🇸 USA Node", addedAt: getNowTimestamp() - 172800000 },
+          { id: "f2", username: "@mia_k", displayName: "Mia K.", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&h=80&q=80", online: false, country: "🇯🇵 Japan Node", addedAt: getNowTimestamp() - 432000000 },
+          { id: "f3", username: "@carlos_r", displayName: "Carlos R.", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&h=80&q=80", online: true, country: "🇧🇷 Brazil Node", addedAt: getNowTimestamp() - 86400000 },
+        ];
+        setFriends(defaultFriends);
+        localStorage.setItem("fm_friends", JSON.stringify(defaultFriends));
+      }
+
+      // Restore Alerts system notifications
+      const localNotifs = localStorage.getItem("fm_notifs");
+      if (localNotifs) {
+        try {
+          setNotifications(JSON.parse(localNotifs));
+        } catch (e) {}
+      } else {
+        const defaultNotifs: LiveNotification[] = [
+          { id: "n1", icon: "👥", title: "Friend Match Pending", desc: "Alex M. sent you a direct message invitation link.", time: "2h ago", read: false, actions: true, actionPayload: { type: "friend_request", senderId: "f1", senderName: "Alex M.", senderUsername: "@alex_m" } },
+          { id: "n2", icon: "⚡", title: "Handshake Channel Ready", desc: "You are successfully fully connected on global chat relays.", time: "1d ago", read: true },
+        ];
+        setNotifications(defaultNotifs);
+        localStorage.setItem("fm_notifs", JSON.stringify(defaultNotifs));
+      }
+
+      // Restore History items
+      const localHist = localStorage.getItem("fm_history");
+      if (localHist) {
+        try {
+          setHistory(JSON.parse(localHist));
+        } catch (e) {}
+      }
+
+      // Initial API pulls
+      fetchRooms();
+      fetchStats();
+
+      setIsReady(true);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [bootStep]);
+
+  // Periodic polling for statistics update
+  useEffect(() => {
+    if (!isReady) return;
+    const statsPollInterval = setInterval(() => {
+      if (settings.streamstats) {
+        fetchStats();
+      }
+    }, 8500);
+
+    return () => clearInterval(statsPollInterval);
+  }, [isReady, settings.streamstats]);
+
+  // Toast dismissers
+  const triggerToast = (msg: string, type: "success" | "info" | "error" = "info") => {
+    const id = `toast-${getNowTimestamp()}-${Math.random().toString(36).substr(2, 5)}`;
+    setToasts(prev => [...prev, { id, msg, type }]);
+
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3200);
+  };
+
+  const removeToastItem = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Profile modifier triggers
+  const handleSaveProfile = (nextProfile: UserProfile) => {
+    setProfile(nextProfile);
+    localStorage.setItem("fm_profile", JSON.stringify(nextProfile));
+  };
+
+  // Contacts modifiers
+  const handleAddFriend = (username: string, displayName: string, country: string) => {
+    const nextFriend: Friend = {
+      id: `f_${Math.random().toString(36).substr(2, 9)}`,
+      username,
+      displayName,
+      avatar: null,
+      online: true,
+      country,
+      addedAt: getNowTimestamp(),
+    };
+    const nextList = [nextFriend, ...friends];
+    setFriends(nextList);
+    localStorage.setItem("fm_friends", JSON.stringify(nextList));
+    triggerToast(`Matched connection stored with peer: ${username}`, "success");
+  };
+
+  const handleRemoveFriend = (id: string) => {
+    const nextList = friends.filter(f => f.id !== id);
+    setFriends(nextList);
+    localStorage.setItem("fm_friends", JSON.stringify(nextList));
+  };
+
+  const handleAcceptFriendRequest = (senderId: string, senderName: string, senderUsername: string) => {
+    const nextFriend: Friend = {
+      id: senderId,
+      username: senderUsername,
+      displayName: senderName,
+      avatar: null,
+      online: true,
+      country: "🌍 Worldwide Node",
+      addedAt: getNowTimestamp(),
+    };
+    const nextList = [nextFriend, ...friends];
+    setFriends(nextList);
+    localStorage.setItem("fm_friends", JSON.stringify(nextList));
+  };
+
+  // Alerts controls
+  const handleMarkAllNotificationsRead = () => {
+    const next = notifications.map(n => ({ ...n, read: true }));
+    setNotifications(next);
+    localStorage.setItem("fm_notifs", JSON.stringify(next));
+    triggerToast("All inbox notifications checked as read", "success");
+  };
+
+  const handleClearNotification = (id: string) => {
+    const next = notifications.filter(n => n.id !== id);
+    setNotifications(next);
+    localStorage.setItem("fm_notifs", JSON.stringify(next));
+  };
+
+  // History logs database
+  const handleAddHistory = (item: { id: string; partnerName: string; partnerCountry: string; messagesCount: number; durationSeconds: number; date: string }) => {
+    if (!settings.telemetryLogging) return;
+    const nextList = [item, ...history];
+    setHistory(nextList);
+    localStorage.setItem("fm_history", JSON.stringify(nextList));
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    localStorage.setItem("fm_history", JSON.stringify([]));
+  };
+
+  const handleRemoveHistoryItem = (id: string) => {
+    const nextList = history.filter(item => item.id !== id);
+    setHistory(nextList);
+    localStorage.setItem("fm_history", JSON.stringify(nextList));
+  };
+
+  // Preferences settings
+  const handleSaveSettings = (nextSettings: any) => {
+    setSettings(nextSettings);
+    localStorage.setItem("fm_settings", JSON.stringify(nextSettings));
+  };
+
+  const handleClearCaches = () => {
+    localStorage.clear();
+    triggerToast("Clearing local configuration registries. Re-routing...", "info");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  };
+
+  const handleLoginSuccess = (userPayload: Partial<UserProfile>) => {
+    const updatedProf = {
+      ...profile,
+      ...userPayload,
+    };
+    setProfile(updatedProf);
+    localStorage.setItem("fm_profile", JSON.stringify(updatedProf));
+    localStorage.setItem("fm_authenticated", "true");
+    setIsAuthenticated(true);
+    triggerToast(`Welcome back, ${userPayload.displayName || "Explorer"}!`, "success");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("fm_authenticated");
+    localStorage.removeItem("fm_profile");
+    setIsAuthenticated(false);
+    
+    // reset profile to empty stranger
+    const defaultUid = `u_${Math.random().toString(36).substr(2, 9)}`;
+    const defaultProf: UserProfile = {
+      id: defaultUid,
+      username: `@stranger_${defaultUid.slice(-4)}`,
+      displayName: "Anonymous Stranger",
+      bio: "Connected & verified on Flux Meet.",
+      country: "🌍 Worldwide",
+      age: 18,
+      avatar: null,
+      verified: true,
+      memberType: "Free",
+      chatsCount: 0,
+      messagesCount: 0,
+      friendsCount: 3,
+      rating: 4.9,
+    };
+    setProfile(defaultProf);
+    localStorage.setItem("fm_profile", JSON.stringify(defaultProf));
+    triggerToast("Google session disconnected safely.", "info");
+    setCurrentView("dashboard");
+  };
+
+  const handleUpgradePremiumSuccess = () => {
+    const nextProf = { ...profile, memberType: "Premium" as const };
+    setProfile(nextProf);
+    localStorage.setItem("fm_profile", JSON.stringify(nextProf));
+    triggerToast("👑 Upgraded to Premium Verified membership!", "success");
+  };
+
+  // Settle theme toggle callback
+  const handleToggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("fm_theme", nextTheme);
+  };
+
+  // Switch rooms handler
+  const handleJoinFeaturedRoom = (room: Room) => {
+    setCurrentView("rooms");
+  };
+
+  return (
+    <div className={`h-screen max-h-screen overflow-hidden flex flex-col font-sans relative select-none transition-colors duration-300 ${
+      theme === "dark" ? "bg-[#080816] text-[#f8fafc]" : "bg-[#f8fafc] text-slate-850"
+    }`}>
+      
+      {/* 🔮 ULTRA-POLISHED PREMIUM ENTRANCE INTRO ANIMATION (2-4 seconds) */}
+      {(!isReady || bootStep < 4) && (
+        <div className="fixed inset-0 z-50 bg-[#060612] flex flex-col items-center justify-center p-6 text-slate-300 font-sans transition-all duration-700">
+          
+          {/* Gentle background particles */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute w-[300px] h-[300px] rounded-full bg-purple-500/10 blur-3xl top-1/4 left-1/4 animate-pulse" />
+            <div className="absolute w-[400px] h-[400px] rounded-full bg-cyan-500/10 blur-3xl bottom-1/4 right-1/4" />
+          </div>
+
+          <div className="w-full max-w-sm text-center relative z-10 flex flex-col items-center gap-7">
+            {/* Glowing scaled premium loops SVG logo */}
+            <PremiumLogo size="xl" animated={true} />
+
+            {/* Glowing title caption */}
+            <div className="flex flex-col gap-1 mt-2">
+              <h2 className="font-sans font-extrabold text-2xl tracking-normal text-white">
+                Flux<span className="text-[#00e5ff] font-medium ml-0.5">Meet</span>
+              </h2>
+              <div className="text-[10px] tracking-widest text-[#7c4dff] font-bold uppercase">
+                Connecting worlds instantly
+              </div>
+            </div>
+
+            {/* Premium SaaS text load messages */}
+            <div className="h-6 overflow-hidden">
+              <p className="text-xs text-slate-400 font-medium animate-pulse">
+                {bootStep === 0 && "Seeding secure local sockets..."}
+                {bootStep === 1 && "Verifying cryptographic protocols..."}
+                {bootStep === 2 && "Synchronizing region node metrics..."}
+                {bootStep === 3 && "Finalizing pristine glass layouts..."}
+                {bootStep >= 4 && "Gateway established successfully!"}
+              </p>
+            </div>
+
+            {/* Subtle progress wire */}
+            <div className="w-48 h-1 bg-slate-900 rounded-full overflow-hidden mt-2">
+              <div 
+                className="h-full bg-gradient-to-r from-[#00e5ff] to-[#7c4dff] rounded-full transition-all duration-300"
+                style={{ width: `${(bootStep / 4) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CORE WEB APP LAYOUT */}
+      {isReady && bootStep >= 4 && (
+        <div className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
+          
+          {/* Auth Security Shield screen when unauthorized */}
+          {!isAuthenticated && (
+            <AuthGateway onLoginSuccess={handleLoginSuccess} theme={theme} />
+          )}
+          
+          {/* Header navigation */}
+          <Navbar
+            profile={profile}
+            notifications={notifications}
+            onlineUsers={onlineUsers}
+            chatsToday={chatsToday}
+            onViewChange={setCurrentView}
+            onOpenNotifications={() => setCurrentView("notifications")}
+            onOpenPremium={() => setIsPremiumOpen(true)}
+            currentView={currentView}
+            theme={theme}
+            onToggleTheme={handleToggleTheme}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          />
+
+          {/* Slide-out mobile drawer menu overlay */}
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 z-50 flex lg:hidden bg-black/70 backdrop-blur-sm transition-all duration-300">
+              {/* Drawer Content */}
+              <div className="relative w-64 h-full flex flex-col shadow-2xl">
+                <Sidebar
+                  currentView={currentView}
+                  onViewChange={setCurrentView}
+                  onOpenPremium={() => setIsPremiumOpen(true)}
+                  theme={theme}
+                  isMobileDrawer={true}
+                  onCloseDrawer={() => setIsMobileMenuOpen(false)}
+                />
+                
+                {/* Close handle inside the drawer side */}
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="absolute right-4 top-4 p-1 rounded-md border border-slate-850 bg-slate-950/80 hover:bg-slate-900 text-slate-400 hover:text-white transition-all cursor-pointer"
+                  title="Close Menu"
+                  id="close-mobile-drawer-btn"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Tap backdrop to close */}
+              <div 
+                className="flex-grow cursor-pointer" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              />
+            </div>
+          )}
+
+          {/* Main split dashboard layout */}
+          <div className="flex-grow flex min-h-0 overflow-hidden">
+            
+            {/* Sidebar menu navigation */}
+            <Sidebar
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              onOpenPremium={() => setIsPremiumOpen(true)}
+              theme={theme}
+            />
+
+            {/* Main panels views routing */}
+            <main className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
+              {currentView === "dashboard" && (
+                <DashboardView
+                  profile={profile}
+                  onlineUsers={onlineUsers}
+                  chatsToday={chatsToday}
+                  countriesCount={countriesCount}
+                  messagesSent={messagesSent}
+                  featuredRooms={rooms}
+                  onViewChange={setCurrentView}
+                  onJoinRoom={handleJoinFeaturedRoom}
+                  onOpenPremium={() => setIsPremiumOpen(true)}
+                  theme={theme}
+                />
+              )}
+
+              {currentView === "match" && (
+                <ChatView
+                  profile={profile}
+                  friends={friends}
+                  onAddFriend={handleAddFriend}
+                  onToast={triggerToast}
+                  onAddHistory={handleAddHistory}
+                  // Let ChatView styles map dynamically
+                />
+              )}
+
+              {currentView === "rooms" && (
+                <RoomsView
+                  rooms={rooms}
+                  onToast={triggerToast}
+                  userId={profile.id}
+                  userName={profile.displayName}
+                />
+              )}
+
+              {currentView === "friends" && (
+                <FriendsView
+                  friends={friends}
+                  onRemoveFriend={handleRemoveFriend}
+                  onOpenAddFriend={() => setIsAddFriendOpen(true)}
+                  onToast={triggerToast}
+                  userName={profile.displayName}
+                />
+              )}
+
+              {currentView === "history" && (
+                <HistoryView
+                  history={history}
+                  onClearHistory={handleClearHistory}
+                  onRemoveHistoryItem={handleRemoveHistoryItem}
+                  onToast={triggerToast}
+                />
+              )}
+
+              {currentView === "profile" && (
+                <ProfileView
+                  profile={profile}
+                  onSaveProfile={handleSaveProfile}
+                  onToast={triggerToast}
+                  theme={theme}
+                  onLogout={handleLogout}
+                />
+              )}
+
+              {currentView === "settings" && (
+                <SettingsView
+                  settings={settings}
+                  onSaveSettings={handleSaveSettings}
+                  onClearCaches={handleClearCaches}
+                  onToast={triggerToast}
+                />
+              )}
+
+              {currentView === "notifications" && (
+                <NotificationsView
+                  notifications={notifications}
+                  onMarkAllRead={handleMarkAllNotificationsRead}
+                  onClearNotification={handleClearNotification}
+                  onAcceptFriendRequest={handleAcceptFriendRequest}
+                  onToast={triggerToast}
+                />
+              )}
+            </main>
+
+          </div>
+
+          {/* OVERLAY MODALS REGISTRY */}
+          <AddFriendModal
+            isOpen={isAddFriendOpen}
+            onClose={() => setIsAddFriendOpen(false)}
+            onAddFriend={handleAddFriend}
+          />
+
+          <PremiumModal
+            isOpen={isPremiumOpen}
+            onClose={() => setIsPremiumOpen(false)}
+            onUpgradeSuccess={handleUpgradePremiumSuccess}
+            currentTier={profile.memberType}
+          />
+
+          {/* FLOATING TOAST SYSTEM */}
+          <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
+            {toasts.map((toast) => (
+              <div
+                key={toast.id}
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs font-semibold shadow-2xl backdrop-blur-md animate-[slideIn_0.2s_ease-out] border-glow-cyan ${
+                  toast.type === "success"
+                    ? "bg-[#090e1c] border-[#00e676]/60 text-white font-glow-green"
+                    : toast.type === "error"
+                    ? "bg-[#180710] border-[#ff4081]/60 text-[#ff4081]"
+                    : "bg-[#08081a] border-[#00e5ff]/50 text-white"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-slate-300" />
+                  <span>{toast.msg}</span>
+                </div>
+                <button
+                  onClick={() => removeToastItem(toast.id)}
+                  className="p-1 hover:bg-white/10 rounded cursor-pointer text-slate-450 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Sticky thumb-centric bottom navigation bar (shown on mobile/tablet screens only) */}
+          <div className={`mt-auto shrink-0 lg:hidden border-t py-2 px-2 sticky bottom-0 z-40 flex justify-around items-center transition-colors duration-300 ${
+            theme === "dark" 
+              ? "border-slate-900 bg-[#060613]/95 backdrop-blur-md text-white" 
+              : "border-slate-200 bg-white/95 backdrop-blur-md text-slate-800"
+          }`} id="mobile-bottom-navigation-bar">
+            {[
+              { id: "dashboard", label: "Dashboard", icon: Compass },
+              { id: "match", label: "Match", icon: MessageSquare },
+              { id: "rooms", label: "Rooms", icon: Users },
+              { id: "friends", label: "Contacts", icon: Users },
+              { id: "profile", label: "Profile", icon: User },
+            ].map((navItem) => {
+              const Icon = navItem.icon;
+              const isActive = currentView === navItem.id;
+              
+              return (
+                <button
+                  key={navItem.id}
+                  onClick={() => {
+                    setCurrentView(navItem.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex flex-col items-center gap-1 cursor-pointer py-1.5 px-3 rounded-xl transition-all relative ${
+                    isActive 
+                      ? theme === "dark" ? "text-[#00e5ff]" : "text-indigo-650 font-bold"
+                      : "text-slate-500 hover:text-slate-400"
+                  }`}
+                  id={`nav-bottom-${navItem.id}`}
+                >
+                  <Icon className={`w-5 h-5 transition-transform ${isActive ? "scale-105" : "hover:scale-105"}`} />
+                  <span className="text-[9px] font-bold tracking-tight font-sans">
+                    {navItem.label}
+                  </span>
+                  {isActive && (
+                    <span className={`absolute -top-0.5 w-1 h-1 rounded-full ${
+                      theme === "dark" ? "bg-[#00e5ff]" : "bg-indigo-600"
+                    }`} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+        </div>
+      )}
+
+    </div>
+  );
+}
