@@ -59,6 +59,25 @@ export default function SettingsView({
     
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // Resilient fetch helper with retry strategy for development environments
+    async function fetchWithRetry(url: string, retries = 3, delayMs = 500): Promise<{ ok: boolean; status: number; data: any }> {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(`HTTP Status ${res.status}`);
+          }
+          const data = await res.json();
+          return { ok: true, status: res.status, data };
+        } catch (err) {
+          if (i === retries) throw err;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs = delayMs * 1.5;
+        }
+      }
+      throw new Error(`Failed all retries for ${url}`);
+    }
+
     // Reset results to testing state
     setTestResults(prev => prev.map(t => ({ ...t, status: "testing", details: "Executing verification diagnostics..." })));
 
@@ -86,13 +105,12 @@ export default function SettingsView({
     let statsPassed = false;
     let statsMsg = "";
     try {
-      const res = await fetch("/api/stats");
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const outcome = await fetchWithRetry("/api/stats");
+      if (outcome.ok && outcome.data.success) {
         statsPassed = true;
-        statsMsg = `✓ Connected. Live telemetry retrieved: ${data.onlineUsers} online, ${data.chatsToday} chats.`;
+        statsMsg = `✓ Connected. Live telemetry retrieved: ${outcome.data.onlineUsers} online, ${outcome.data.chatsToday} chats.`;
       } else {
-        statsMsg = `✗ Server responded with status code: ${res.status}`;
+        statsMsg = `✗ Server responded with status code: ${outcome.status}`;
       }
     } catch (e) {
       statsMsg = `✗ Connection failed: ${(e as Error).message}`;
@@ -104,13 +122,12 @@ export default function SettingsView({
     let roomsPassed = false;
     let roomsMsg = "";
     try {
-      const res = await fetch("/api/rooms");
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const outcome = await fetchWithRetry("/api/rooms");
+      if (outcome.ok && outcome.data.success) {
         roomsPassed = true;
-        roomsMsg = `✓ Connected. Parsed ${data.rooms?.length || 0} active multicast rooms successfully.`;
+        roomsMsg = `✓ Connected. Parsed ${outcome.data.rooms?.length || 0} active multicast rooms successfully.`;
       } else {
-        roomsMsg = `✗ Server responded with status code: ${res.status}`;
+        roomsMsg = `✗ Server responded with status code: ${outcome.status}`;
       }
     } catch (e) {
       roomsMsg = `✗ Connection failed: ${(e as Error).message}`;

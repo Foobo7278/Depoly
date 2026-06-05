@@ -55,6 +55,26 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
   const [securityLogs, setSecurityLogs] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Bot detection display states
+  const [botScore, setBotScore] = useState<number | null>(null);
+  const [mousePoints, setMousePoints] = useState<{ x: number; y: number; t: number }[]>([]);
+  const [loadTime] = useState<number>(Date.now());
+  const challengeTarget = 100;
+
+  // Track dynamic mouse coordinate trajectories overlay
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (mousePoints.length < 50) {
+      setMousePoints(prev => [
+        ...prev,
+        {
+          x: e.clientX,
+          y: e.clientY,
+          t: Date.now() - loadTime,
+        }
+      ]);
+    }
+  };
+
   // Arithmetic verification states
   const [num1, setNum1] = useState(0);
   const [num2, setNum2] = useState(0);
@@ -107,6 +127,7 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
         const data = await response.json();
 
         if (data.success) {
+          setBotScore(data.score !== undefined ? data.score : (data.isBot ? 1.0 : 0.0));
           if (data.isBot) {
             setVerificationError("Verification failed: Sum is incorrect. Please try again.");
             generateMathChallenge();
@@ -228,6 +249,7 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
 
   return (
     <div 
+      onMouseMove={handleMouseMove}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xl transition-all duration-500 ${
         isDark ? "bg-[#04040e]/95" : "bg-slate-100/90"
       }`}
@@ -467,8 +489,9 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
                 <button
                   onClick={() => {
                     setStage(1);
-                    setSliderVal(10);
+                    generateMathChallenge();
                     setMousePoints([]);
+                    setBotScore(null);
                   }}
                   className="mt-4 px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold tracking-wider rounded-xl cursor-pointer"
                 >

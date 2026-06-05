@@ -35,6 +35,25 @@ import PremiumLogo from "@/components/Shared/PremiumLogo";
 
 const getNowTimestamp = () => Date.now();
 
+// Resilient fetch helper with retry strategy for development environments
+async function fetchWithRetry(url: string, retries = 4, delayMs = 800): Promise<any> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP Status ${res.status}`);
+      }
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      if (i === retries) throw err;
+      console.warn(`Resilient fetch warning targeting ${url} (Attempt ${i + 1}/${retries + 1} failed). Retrying in ${delayMs}ms. Error:`, err);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      delayMs = delayMs * 1.5; // Exponential backoff multiplier
+    }
+  }
+}
+
 export default function Page() {
   const [isReady, setIsReady] = useState(false);
   const [currentView, setCurrentView] = useState<string>("dashboard");
@@ -88,32 +107,30 @@ export default function Page() {
   const [toasts, setToasts] = useState<{ id: string; msg: string; type: "success" | "info" | "error" }[]>([]);
 
   // Telemetry APIs
-  async function fetchRooms() {
+  const fetchRooms = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/rooms");
-      const data = await res.json();
-      if (data.success) {
+      const data = await fetchWithRetry("/api/rooms");
+      if (data && data.success) {
         setRooms(data.rooms);
       }
     } catch (e) {
       console.error("Rooms fetch error:", e);
     }
-  }
+  }, []);
 
-  async function fetchStats() {
+  const fetchStats = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/stats");
-      const data = await res.json();
-      if (data.success) {
+      const data = await fetchWithRetry("/api/stats");
+      if (data && data.success) {
         setOnlineUsers(data.onlineUsers);
         setChatsToday(data.chatsToday);
         setCountriesCount(data.countriesCount);
         setMessagesSent(data.messagesSentCount);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Stats fetch error:", e);
     }
-  }
+  }, []);
 
   // Load and cycle through progress triggers during modern 3.2 second loader duration
   useEffect(() => {
@@ -237,7 +254,7 @@ export default function Page() {
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [bootStep]);
+  }, [bootStep, fetchRooms, fetchStats]);
 
   // Periodic polling for statistics update
   useEffect(() => {
@@ -249,7 +266,7 @@ export default function Page() {
     }, 8500);
 
     return () => clearInterval(statsPollInterval);
-  }, [isReady, settings.streamstats]);
+  }, [isReady, settings.streamstats, fetchStats]);
 
   // Toast dismissers
   const triggerToast = (msg: string, type: "success" | "info" | "error" = "info") => {
