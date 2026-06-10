@@ -33,6 +33,13 @@ export default function Sidebar({
 }: SidebarProps) {
   const isDark = theme === "dark";
 
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsAdmin(localStorage.getItem("flux_is_admin") === "true");
+    }
+  }, []);
+
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: Compass },
     { id: "match", label: "Match Chat", icon: MessageSquare },
@@ -41,6 +48,7 @@ export default function Sidebar({
     { id: "history", label: "Chat History", icon: History },
     { id: "profile", label: "My Profile", icon: User },
     { id: "settings", label: "Settings", icon: Settings },
+    { id: "admin", label: "🔒 Admin Panel", icon: Settings },
   ];
 
   return (

@@ -42,9 +42,9 @@ export default function DashboardView({
   const isDark = theme === "dark";
   
   const telemetryStats = [
-    { label: "Active Matchers", value: onlineUsers.toLocaleString(), icon: Users, color: isDark ? "text-[#00e5ff]" : "text-indigo-600" },
+    { label: "Online Members", value: onlineUsers.toLocaleString(), icon: Users, color: isDark ? "text-[#00e5ff]" : "text-indigo-600" },
     { label: "Matches Today", value: chatsToday.toLocaleString(), icon: ShieldCheck, color: "text-emerald-500" },
-    { label: "Regions Online", value: `${countriesCount} countries`, icon: Globe, color: "text-purple-500" },
+    { label: "Global Regions", value: `${countriesCount} countries`, icon: Globe, color: "text-purple-500" },
     { label: "Total Messages", value: messagesSent.toLocaleString(), icon: MessageSquare, color: "text-pink-500" },
   ];
 

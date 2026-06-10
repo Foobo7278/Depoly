@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NEXT_DEV=true rm -rf .next_dev && NEXT_DEV=true next dev -p 3000",
     "build": "next build",
-    "start": "node server.ts",
+    "start": "node server.js",
     "lint": "next lint"
   },
   "dependencies": {

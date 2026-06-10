@@ -28,15 +28,12 @@ import { cn, formatTime } from "@/lib/utils";
 import ReportModal from "./Shared/ReportModal";
 
 const SEARCH_LOGS = [
-  "DECODING SATELLITE HANDSHAKE VECTORS...",
-  "VERIFYING CRYPTOGRAPHIC SYMMETRIC SIGNATURES...",
-  "TUNNELING THROUGH MULTIPLE DISPERSED ORBITS...",
-  "FILTERING BOT COMPLIANCE BEHAVIOR METRICS...",
-  "MATCHING REPUTATION RATINGS COGNIZANT SYSTEM...",
-  "STABILIZING HIGH-BANDWIDTH TUNNEL PORTALS...",
-  "ESTABLISHING SECURE PROTOCOL MATRIX HANDSHAKES...",
-  "RESOLVING DECENTRALISED METRIC GATEWAYS...",
-  "SCANNING NOISE SPECTRUM FOR ACTIVE SIGNAL PEERS..."
+  "CONNECTING REGIONAL MATCHMAKING SERVICES...",
+  "LOOKING FOR COMPATIBLE CHAT CHANNELS...",
+  "DECRYPTION TUNNEL READY AND ESTABLISHED...",
+  "VERIFYING SENTIENT COMMUNICATOR SIGNATURES...",
+  "ENGAGING HIGH-SPEED CONVERSATION PIPELINE...",
+  "SCANNING GLOBALLY ACTIVE CHAT CHANNELS..."
 ];
 
 interface ChatViewProps {
@@ -72,15 +69,20 @@ export default function ChatView({
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [localTyping, setLocalTyping] = useState(false);
   const localTypingTimeoutRef = useRef<any>(null);
-  const [autoSkip, setAutoSkip] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fm_autoskip") === "true";
-    }
-    return false;
-  });
+  const [autoSkip, setAutoSkip] = useState<boolean>(false);
+  const isAutoSkipLoaded = useRef(false);
 
   useEffect(() => {
-    localStorage.setItem("fm_autoskip", String(autoSkip));
+    if (typeof window !== "undefined") {
+      setAutoSkip(localStorage.getItem("fm_autoskip") === "true");
+      isAutoSkipLoaded.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAutoSkipLoaded.current) {
+      localStorage.setItem("fm_autoskip", String(autoSkip));
+    }
   }, [autoSkip]);
 
   // Modals Info
@@ -345,9 +347,152 @@ export default function ChatView({
   };
 
   // Submit messages
+  // Submit messages
   const submitSendMessage = async () => {
     const rawText = inputText.trim();
     if (!rawText || !activeMatch) return;
+
+    // Check if user is muted or banned in local state before transmitting
+    const isMuted = profile.status === "muted";
+    const isBanned = profile.status === "banned";
+    if (isMuted || isBanned) {
+      onToast("🔇 Transmission Blocked: Your account features have been temporarily restricted by the administration.", "error");
+      setInputText("");
+      return;
+    }
+
+    // --- Content Filtering Check ---
+    if (typeof window !== "undefined") {
+      const savedKeywordsRaw = localStorage.getItem("flux_admin_keywords");
+      if (savedKeywordsRaw) {
+        try {
+          const loadedKeywords = JSON.parse(savedKeywordsRaw);
+          const rawLower = rawText.toLowerCase();
+          
+          for (const kw of loadedKeywords) {
+            let matched = false;
+            if (kw.isRegex) {
+              try {
+                const reg = new RegExp(kw.phrase, "i");
+                matched = reg.test(rawText);
+              } catch (e) {}
+            } else {
+              matched = rawLower.includes(kw.phrase.toLowerCase());
+            }
+
+            if (matched) {
+              // Increment triggers count
+              kw.triggersCount = (kw.triggersCount || 0) + 1;
+              localStorage.setItem("flux_admin_keywords", JSON.stringify(loadedKeywords));
+
+              // Report or log incident
+              const currentUsername = profile.username || "@stranger_user";
+              const currentId = profile.id;
+
+              // Record in Audit logs
+              const savedLogsRaw = localStorage.getItem("flux_admin_audit_logs");
+              if (savedLogsRaw) {
+                try {
+                  const parsedLogs = JSON.parse(savedLogsRaw);
+                  const newIncident = {
+                    id: `log_inc_${Date.now()}`,
+                    adminName: "System Sentinel",
+                    action: "KEYWORD_VIOLATION",
+                    target: `${currentUsername} triggered phrase: [ ${kw.phrase} ]`,
+                    timestamp: new Date().toISOString()
+                  };
+                  localStorage.setItem("flux_admin_audit_logs", JSON.stringify([newIncident, ...parsedLogs]));
+                } catch (e) {}
+              }
+
+              if (kw.action === "warn") {
+                onToast(`🚨 SYSTEM SENTINEL: Phrase [ ${kw.phrase} ] violates content policies. Session flagged.`, "error");
+                setInputText("");
+                return; // Block message, warn user
+              } else if (kw.action === "mute") {
+                onToast(`🔇 SYSTEM MUTED: Your transmission console has been muted for policy violation.`, "error");
+                
+                // Set muted in profile
+                const activeUserRaw = localStorage.getItem("fm_profile");
+                if (activeUserRaw) {
+                  try {
+                    const parsedP = JSON.parse(activeUserRaw);
+                    parsedP.status = "muted";
+                    localStorage.setItem("fm_profile", JSON.stringify(parsedP));
+                  } catch (e) {}
+                }
+
+                // Set muted in admin users database
+                const adminUsersRaw = localStorage.getItem("flux_admin_users");
+                if (adminUsersRaw) {
+                  try {
+                    const parsedAdmins = JSON.parse(adminUsersRaw);
+                    const idx = parsedAdmins.findIndex((u: any) => u.id === currentId || u.username === currentUsername);
+                    if (idx !== -1) {
+                      parsedAdmins[idx].status = "muted";
+                      parsedAdmins[idx].banHistory = [...(parsedAdmins[idx].banHistory || []), `Muted by Filter system for keyword: [ ${kw.phrase} ]`];
+                      localStorage.setItem("flux_admin_users", JSON.stringify(parsedAdmins));
+                    }
+                  } catch (e) {}
+                }
+
+                setInputText("");
+                // Force window storage sync call
+                window.dispatchEvent(new Event("storage"));
+                return;
+              } else if (kw.action === "ban") {
+                onToast(`🚫 SYSTEM BANNED: Your access is permanently restricted for severe violations.`, "error");
+                
+                // Set banned in profile
+                const activeUserRaw = localStorage.getItem("fm_profile");
+                if (activeUserRaw) {
+                  try {
+                    const parsedP = JSON.parse(activeUserRaw);
+                    parsedP.status = "banned";
+                    localStorage.setItem("fm_profile", JSON.stringify(parsedP));
+                  } catch (e) {}
+                }
+
+                // Add to bans list
+                const bansRaw = localStorage.getItem("flux_admin_bans");
+                if (bansRaw) {
+                  try {
+                    const parsedBans = JSON.parse(bansRaw);
+                    const newBan = {
+                      id: `ban_sys_${Date.now()}`,
+                      userId: currentId,
+                      reason: `Triggered restricted keyword filter: [ ${kw.phrase} ]`,
+                      adminName: "System Sentinel",
+                      expiryDate: "Permanent"
+                    };
+                    localStorage.setItem("flux_admin_bans", JSON.stringify([newBan, ...parsedBans]));
+                  } catch (e) {}
+                }
+
+                // Set banned in admin list
+                const adminUsersRaw = localStorage.getItem("flux_admin_users");
+                if (adminUsersRaw) {
+                  try {
+                    const parsedAdmins = JSON.parse(adminUsersRaw);
+                    const idx = parsedAdmins.findIndex((u: any) => u.id === currentId || u.username === currentUsername);
+                    if (idx !== -1) {
+                      parsedAdmins[idx].status = "banned";
+                      parsedAdmins[idx].banHistory = [...(parsedAdmins[idx].banHistory || []), `Hardware Banned by System Sentinel: [ ${kw.phrase} ]`];
+                      localStorage.setItem("flux_admin_users", JSON.stringify(parsedAdmins));
+                    }
+                  } catch (e) {}
+                }
+
+                setInputText("");
+                // Force window storage sync call
+                window.dispatchEvent(new Event("storage"));
+                return;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
 
     setInputText("");
     setSending(true);
@@ -572,18 +717,18 @@ export default function ChatView({
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20 uppercase mb-4 animate-pulse">
             <Radio className="w-3 h-3 text-[#00e5ff]" />
-            GRID CHANNELS: {nodesCount} ONLINE PEERS
+            ACTIVE CHANNELS: {nodesCount} PEERS AVAILABLE
           </span>
 
           <h3 className="font-orbitron font-extrabold text-lg tracking-widest text-[#00e5ff] uppercase">
-            ESTABLISHING TRANS-NODE SEED...
+            FINDING AN INTERESTING PARTNER...
           </h3>
 
           <p className="text-xs font-mono font-bold text-[#00e676] tracking-wider mt-2.5 bg-[#00e676]/10 px-3 py-1 rounded-md border border-[#00e676]/20 inline-block shadow-[0_0_10px_rgba(0,230,118,0.1)]">
             ELAPSED TIME: {formatTime(searchDuration)}
           </p>
 
-          {/* Dynamic rotating diagnostics logs loop with slide effects */}
+          {/* Dynamic rotating diagnostics log panel */}
           <div className="h-10 text-center w-full mt-6 flex items-center justify-center overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.p
@@ -601,14 +746,14 @@ export default function ChatView({
           </div>
 
           <p className="text-[10px] text-slate-500 font-mono mt-2 select-none">
-            Routing matching vectors via satellite constellations...
+            Connecting you securely with random individuals worldwide...
           </p>
 
           {queueTimerMessage && (
             <div className="mt-6 p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-400/20 text-left text-[10px] text-slate-300 font-mono flex items-start gap-3 max-w-sm">
               <AlertCircle className="w-4 h-4 text-[#7c4dff] flex-shrink-0 mt-0.5 animate-bounce" />
               <span>
-                Bandwidth congestion normal. Upgrade handshake vector channels... Waiting on instantaneous quantum synchronized connection.
+                Matching filters active. Waiting to pair you with the best available matches...
               </span>
             </div>
           )}
@@ -618,7 +763,7 @@ export default function ChatView({
             className="mt-8 px-6 py-2.5 rounded-xl border border-[#ff4081]/30 hover:border-[#ff4081] text-[#ff4081] hover:bg-[#ff4081]/10 text-[10px] font-mono font-black uppercase tracking-wider cursor-pointer transition-all hover:shadow-[0_0_12px_rgba(255,64,129,0.15)] flex items-center gap-1.5"
           >
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>TERMINATE Tunnel SEED</span>
+            <span>CANCEL MATCHMAKING</span>
           </button>
         </div>
       )}
@@ -791,15 +936,24 @@ export default function ChatView({
           <div className="p-4 border-t border-[#12122d] bg-[#0c0c1e] flex gap-2 items-center z-10">
             <input
               type="text"
-              placeholder="Key in transmission packets..."
+              placeholder={
+                profile.status === "muted"
+                  ? "🔇 You have been muted by the system administrators."
+                  : profile.status === "banned"
+                  ? "🚫 Account suspension directive active."
+                  : "Key in transmission packets..."
+              }
+              disabled={profile.status === "muted" || profile.status === "banned"}
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-grow bg-[#060613] border border-[#1b1b42] focus:border-[#00e5ff] text-xs font-mono text-white placeholder-slate-600 outline-none rounded-lg py-2.5 px-3.5 transition-all"
+              className={`flex-grow bg-[#060613] border border-[#1b1b42] focus:border-[#00e5ff] text-xs font-mono text-white placeholder-slate-600 outline-none rounded-lg py-2.5 px-3.5 transition-all ${
+                (profile.status === "muted" || profile.status === "banned") ? "opacity-50 cursor-not-allowed border-red-500/30" : ""
+              }`}
             />
             <button
               onClick={submitSendMessage}
-              disabled={sending || !inputText.trim()}
+              disabled={sending || !inputText.trim() || profile.status === "muted" || profile.status === "banned"}
               className="p-2.5 bg-gradient-to-r from-[#00e5ff] to-[#7c4dff] hover:opacity-90 disabled:opacity-40 rounded-lg text-white font-bold cursor-pointer transition-all flex items-center justify-center shadow-lg"
             >
               <Send className="w-4 h-4" />

@@ -99,6 +99,44 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
   const [customName, setCustomName] = useState("");
   const [customEmail, setCustomEmail] = useState("");
 
+  // Dynamic Google Credentials States inside AuthGateway
+  const [gatewayGoogleId, setGatewayGoogleId] = useState("");
+  const [gatewayGoogleSecret, setGatewayGoogleSecret] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setGatewayGoogleId(localStorage.getItem("flux_google_client_id") || "");
+      setGatewayGoogleSecret(localStorage.getItem("flux_google_client_secret") || "");
+    }
+  }, []);
+
+  // Admin access secret token password prompts
+  const [isAdminPromptOpen, setIsAdminPromptOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState("");
+  const [isWavingWelcome, setIsWavingWelcome] = useState(false);
+
+  const handleAdminSubmit = () => {
+    if (adminPassword === "Ayush&Ayush") {
+      setIsWavingWelcome(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("flux_is_admin", "true");
+      }
+      setTimeout(() => {
+        onLoginSuccess({
+          id: "admin_ayush",
+          username: "@ayush",
+          displayName: "Ayush",
+          verified: true,
+          memberType: "Premium",
+          bio: "Unmasked root master node of FluxMeet network terminal server."
+        });
+      }, 1800);
+    } else {
+      setAdminError("Access Denied: Invalid Administrative Token Key.");
+    }
+  };
+
   const verifyHumanChallenge = async () => {
     const trimmed = userAnswer.trim();
     if (!trimmed) {
@@ -157,7 +195,16 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
   const handleRealGoogleOAuth = async () => {
     try {
       setSecurityLogs(prev => [...prev, "Fetching active Google OAuth client context..."]);
-      const res = await fetch("/api/auth/google/url");
+      
+      const customId = typeof window !== "undefined" ? localStorage.getItem("flux_google_client_id") || "" : "";
+      const customSecret = typeof window !== "undefined" ? localStorage.getItem("flux_google_client_secret") || "" : "";
+      
+      const qParams = new URLSearchParams();
+      if (customId) qParams.set("clientId", customId);
+      if (customSecret) qParams.set("clientSecret", customSecret);
+      
+      const endpoint = "/api/auth/google/url" + (qParams.toString() ? `?${qParams.toString()}` : "");
+      const res = await fetch(endpoint);
       const data = await res.json();
 
       if (data.success && data.configured && data.url) {
@@ -179,7 +226,11 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
         }
       } else {
         // Google client is undefined. Notify sandbox options or fallback
-        setSecurityLogs(prev => [...prev, "Google Client ID was empty in configuration. Showing test workspace login credentials."]);
+        const message = data.message || "Google Client ID was empty in configuration.";
+        setSecurityLogs(prev => [
+          ...prev, 
+          `${message} Access properties or customize developer credentials under settings.`
+        ]);
         setShowCustomForm(true);
       }
     } catch (e: any) {
@@ -260,16 +311,21 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
         <div className="absolute w-[500px] h-[500px] rounded-full bg-purple-500/5 blur-3xl -bottom-20 -right-20 animate-pulse" />
       </div>
 
-      <div className="w-full max-w-4xl grid md:grid-cols-12 gap-6 relative z-10">
+      <div className="w-full max-w-md relative z-10">
         
-        {/* LEFT COLUMN: AUTH FORM / VERIFICATION */}
-        <div className={`md:col-span-7 rounded-3xl border p-6 md:p-8 flex flex-col justify-between shadow-2xl transition-all duration-300 ${
+        {/* CENTERED AUTH FORM / VERIFICATION */}
+        <div className={`w-full rounded-3xl border p-6 md:p-8 flex flex-col justify-between shadow-2xl transition-all duration-300 ${
           isDark 
             ? "bg-[#0a0a1a]/90 border-slate-800/80 text-white" 
             : "bg-white border-slate-200 text-slate-800"
         }`}>
           <div>
-            <div className="flex items-center gap-3.5 mb-6">
+            <div 
+              onClick={() => setIsAdminPromptOpen(true)}
+              className="flex items-center gap-3.5 mb-6 cursor-pointer hover:opacity-85 select-none transition-all active:scale-[0.99]"
+              title="Click to prompt administrative security terminal override"
+              id="auth-gateway-brand-logo"
+            >
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00e5ff] to-[#7c4dff] flex items-center justify-center text-white shadow-lg">
                 <Lock className="w-5 h-5 animate-pulse" />
               </div>
@@ -395,69 +451,50 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
                   </span>
                 </button>
 
-                {/* GOOGLE SANDBOX ACCOUNTS DESIGN PANEL */}
-                <div className="pt-4 border-t border-dashed border-slate-800">
-                  <div className="flex items-center justify-between mb-3.5">
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-bold">
+                {/* Guest Simulation Path */}
+                <div className="p-3.5 rounded-xl border border-dashed border-[#1b1b45] bg-[#0c0c1e]/40 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 uppercase font-bold">
                       <Sparkles className="w-3.5 h-3.5 text-[#00e5ff]" />
-                      <span>OFFLINE GOOGLE AUTH COVERT SANDBOX</span>
-                    </div>
+                      <span>Guest Session Handshake</span>
+                    </span>
                     <button 
                       onClick={() => setShowCustomForm(!showCustomForm)}
-                      className="text-[10px] text-[#7c4dff] hover:text-[#00e5ff] font-bold underline cursor-pointer"
+                      className="text-[10px] text-[#7c4dff] hover:text-[#00e5ff] font-bold underline cursor-pointer uppercase transition"
                     >
-                      {showCustomForm ? "View list" : "Create custom Google profile"}
+                      {showCustomForm ? "Cancel" : "Simulate Session"}
                     </button>
                   </div>
 
-                  {!showCustomForm ? (
-                    <div className="grid gap-2.5">
-                      {SANDBOX_PROFILES.map((prof, i) => (
-                        <div 
-                          key={i}
-                          onClick={() => handleSandboxLogin(prof)}
-                          className="p-3 rounded-xl border border-slate-800/60 bg-[#0d0d20]/50 hover:bg-[#11112e] cursor-pointer flex items-center justify-between transition-all group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Image src={prof.avatar} alt="P" width={32} height={32} unoptimized referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover border border-[#7c4dff]/30" />
-                            <div className="text-left">
-                              <div className="text-xs font-bold text-white group-hover:text-[#00e5ff]">{prof.displayName}</div>
-                              <div className="text-[10px] text-slate-400 font-medium">{prof.email}</div>
-                            </div>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-[#00e5ff]" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <form onSubmit={handleCustomFormSubmit} className="space-y-3 animate-[fadeIn_0.2s_ease]">
+                  {showCustomForm && (
+                    <form onSubmit={handleCustomFormSubmit} className="mt-3.5 space-y-3.5 animate-[fadeIn_0.2s_ease]">
                       <div>
-                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Gmail Display Name</label>
+                        <label className="block text-[9px] text-[#00e5ff] font-mono font-bold uppercase mb-1">Display Name</label>
                         <input 
                           type="text" 
                           required
                           value={customName}
                           onChange={(e) => setCustomName(e.target.value)}
-                          placeholder="SpongeBob SquarePants"
+                          placeholder="E.g., John Doe"
                           className="w-full bg-[#0d0d29] border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#7c4dff]"
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Gmail Secondary Address</label>
+                        <label className="block text-[9px] text-[#00e5ff] font-mono font-bold uppercase mb-1">Backup Email Address</label>
                         <input 
                           type="email" 
                           required
                           value={customEmail}
                           onChange={(e) => setCustomEmail(e.target.value)}
-                          placeholder="spongebob7278@gmail.com"
-                          className="w-full bg-[#0d0d29] border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#7c4dff]"
+                          placeholder="john.doe32@gmail.com"
+                          className="w-full bg-[#0d0d29] border border-slate-805 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#7c4dff]"
                         />
                       </div>
                       <button 
                         type="submit"
                         className="w-full py-2.5 bg-[#7c4dff] hover:bg-[#7c4dff]/90 text-white rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer shadow-md"
                       >
-                        Launch Custom Google Session
+                        Launch Guest Session &gt;
                       </button>
                     </form>
                   )}
@@ -507,95 +544,91 @@ export default function AuthGateway({ onLoginSuccess, theme }: AuthGatewayProps)
           </div>
         </div>
 
-        {/* RIGHT COLUMN: CYBER THREAT AUDIT / BOT INSPECTOR PANEL */}
-        <div className={`md:col-span-5 rounded-3xl border p-5 flex flex-col justify-between shadow-2xl transition-all duration-300 ${
-          isDark 
-            ? "bg-[#050512] border-slate-800/80 text-white" 
-            : "bg-slate-50 border-slate-200 text-slate-800"
-        }`}>
-          <div>
-            <div className="flex items-center gap-2.5 mb-4 font-sans font-bold text-xs tracking-wider">
-              <Cpu className="w-4 h-4 text-[#00e5ff] animate-pulse" />
-              <span>BOT INSPECTION DASHBOARD</span>
+      </div>
+
+      {/* 🔐 Admin Passcode Authentication Dialogue Modal */}
+      {isAdminPromptOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-sm p-6 rounded-3xl border bg-gradient-to-br from-[#0c0c22] to-black border-[#7c4dff]/45 text-center space-y-5 shadow-[0_0_40px_rgba(124,77,255,0.3)]">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00e5ff] to-[#7c4dff] flex items-center justify-center text-white mx-auto shadow-md">
+              <Lock className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-orbitron">🔐 Administrative Terminal Access</h3>
+              <p className="text-[10px] text-slate-400 font-mono mt-1">Security verification required. Enter administrative access pass below.</p>
+            </div>
+            
+            <div className="space-y-3">
+              <input
+                type="password"
+                placeholder="Enter Secret Password"
+                autoFocus
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  setAdminError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleAdminSubmit();
+                  }
+                }}
+                className="w-full text-center font-mono bg-black border border-[#1b1b45] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] transition-all placeholder-slate-750"
+              />
+              {adminError && (
+                <div className="text-[10px] text-[#ff4081] font-mono leading-tight bg-[#200510] border border-[#ff4081]/35 p-2 rounded-lg">
+                  ⚠️ {adminError}
+                </div>
+              )}
             </div>
 
-            {/* REAL-TIME CLIENT BEHAVIOR SUMMARY */}
-            <div className="space-y-3.5">
-              
-              {/* Bot Probability Gauge */}
-              <div className="p-4 rounded-2xl bg-black/45 border border-slate-850">
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Automation Likelihood</span>
-                  <span className={`text-xs font-bold ${
-                    botScore === null ? "text-slate-500" : botScore > 0.45 ? "text-red-400" : "text-emerald-400"
-                  }`}>
-                    {botScore === null ? "PENDING ANALYSIS" : `${(botScore * 100).toFixed(1)}%`}
-                  </span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-700 ${
-                      botScore === null 
-                        ? "bg-slate-700 w-0" 
-                        : botScore > 0.45 
-                        ? "bg-red-500" 
-                        : "bg-emerald-500"
-                    }`}
-                    style={{ width: botScore === null ? "0%" : `${botScore * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Live coordinates tracker logger */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold">
-                  <span>TELEMETRY TRACE STREAM</span>
-                  <span>{mousePoints.length} points logged</span>
-                </div>
-                <div className="h-28 bg-[#03030d] border border-slate-900 rounded-xl p-2.5 font-mono text-[9px] text-[#00e5ff] overflow-y-auto space-y-1">
-                  {mousePoints.length === 0 ? (
-                    <div className="text-slate-600 animate-pulse">Waiting for cursor trajectory input activity...</div>
-                  ) : (
-                    [...mousePoints].reverse().slice(0, 10).map((pt, index) => (
-                      <div key={index} className="flex justify-between">
-                        <span>TRACE_X: {pt.x.toFixed(0)}px | TRACE_Y: {pt.y.toFixed(0)}px</span>
-                        <span className="text-[#7c4dff]">{pt.t}ms</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Cyber threat logging audit output console */}
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-500 font-bold">AUDIT INSPECTION LOGS</div>
-                <div className="h-32 bg-[#02020a] border border-slate-950 rounded-xl p-2.5 font-mono text-[9px] text-slate-400 overflow-y-auto space-y-1.5 scrollbar-thin">
-                  {securityLogs.length === 0 ? (
-                    <div className="text-slate-600">Secure pipeline waiting for verification request...</div>
-                  ) : (
-                    securityLogs.map((log, i) => (
-                      <div key={i} className={`leading-relaxed ${
-                        log.startsWith("🛑") ? "text-red-400" : log.startsWith("🔍") ? "text-[#00e5ff]" : "text-slate-350"
-                      }`}>
-                        {log}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
+            <div className="flex gap-2">
+              <button
+                onClick={handleAdminSubmit}
+                className="flex-1 py-2.5 bg-[#7c4dff] hover:bg-[#6c3df0] text-white text-[11px] font-bold font-orbitron tracking-wide rounded-xl transition-all cursor-pointer shadow-md"
+              >
+                AUTHORIZE ACCESS
+              </button>
+              <button
+                onClick={() => {
+                  setIsAdminPromptOpen(false);
+                  setAdminPassword("");
+                  setAdminError("");
+                }}
+                className="px-4 py-2.5 bg-slate-900 border border-slate-800 text-slate-400 text-[11px] rounded-xl cursor-pointer hover:text-white"
+              >
+                CANCEL
+              </button>
             </div>
-          </div>
-
-          <div className="mt-4 p-3 rounded-xl bg-slate-900/40 border border-slate-850 text-[10px] text-slate-400 flex gap-2.5 items-start">
-            <Info className="w-3.5 h-3.5 text-[#00e5ff] flex-shrink-0" />
-            <p className="leading-normal">
-              Flux P2P client relies on rigorous mouse trace acceleration metrics. Bots moving along linear computer-generated math models will be categorized instantly.
-            </p>
           </div>
         </div>
+      )}
 
-      </div>
+      {/* 🌟 Radiant "Welcome Ayush" Animated Validation Stage */}
+      {isWavingWelcome && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 bg-[#04040e]/95 backdrop-blur-xl text-white animate-[fadeIn_0.3s_ease]">
+          <div
+            className="text-center space-y-6 max-w-sm p-8 rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#0c0c24]/90 to-black shadow-[0_0_50px_rgba(0,229,255,0.35)]"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-[#00e5ff]/50 flex items-center justify-center text-cyan-400 mx-auto animate-bounce">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-[#00e5ff] bg-clip-text text-transparent font-sans drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] animate-pulse">
+                Welcome Ayush
+              </h1>
+              <p className="text-xs text-slate-450 font-mono mt-2 tracking-widest uppercase">
+                ADMINISTRATIVE NODE VERIFIED
+              </p>
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono max-w-xs leading-relaxed">
+              Initializing secure channels...
+              <br />Deploying admin properties telemetry log.
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

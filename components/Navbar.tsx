@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
-import { Shield, Sparkles, Bell, Wifi, Activity, Moon, Sun, Menu } from "lucide-react";
+import { Shield, Sparkles, Bell, Wifi, Activity, Moon, Sun, Menu, Lock, ShieldCheck } from "lucide-react";
 import { UserProfile, LiveNotification } from "@/lib/types";
 import PremiumLogo from "./Shared/PremiumLogo";
 
@@ -36,6 +36,11 @@ export default function Navbar({
   const unreadCount = notifications.filter(n => !n.read).length;
   const isDark = theme === "dark";
 
+  // Handle logo click to navigate to dashboard
+  const handleLogoClick = () => {
+    onViewChange("dashboard");
+  };
+
   return (
     <header className={`border-b sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between transition-colors duration-300 ${
       isDark 
@@ -58,8 +63,10 @@ export default function Navbar({
           </button>
         )}
         <div 
-          onClick={() => onViewChange("dashboard")}
-          className="cursor-pointer flex items-center gap-3 group transition-all"
+          onClick={handleLogoClick}
+          className="cursor-pointer flex items-center gap-3 group transition-all select-none"
+          title="Return to Dashboard view"
+          id="navbar-fluxmeet-brand-logo"
         >
           {/* Mini active premium logo */}
           <PremiumLogo size="sm" animated={true} />

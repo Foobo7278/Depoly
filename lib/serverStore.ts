@@ -1,5 +1,61 @@
 import { UserProfile, Room, MatchResult, Message } from "./types";
 
+export interface AdminUser {
+  id: string;
+  username: string;
+  email: string;
+  ip: string;
+  country: string;
+  joinDate: string;
+  totalSessions: number;
+  reportsReceived: number;
+  status: "active" | "warned" | "muted" | "banned";
+  banHistory: string[];
+}
+
+export interface UserReport {
+  id: string;
+  reportedUserId: string;
+  reportedUsername: string;
+  reporterName: string;
+  reason: string;
+  status: "pending" | "reviewed" | "escalated";
+  timestamp: string;
+  chatTranscript: { sender: string; text: string }[];
+}
+
+export interface BanRecord {
+  id: string;
+  userId?: string;
+  ipAddress?: string;
+  reason: string;
+  adminName: string;
+  expiryDate: string;
+}
+
+export interface KeywordFilter {
+  id: string;
+  phrase: string;
+  isRegex: boolean;
+  action: "warn" | "mute" | "ban";
+  triggersCount: number;
+}
+
+export interface AdminAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: "Super Admin" | "Moderator" | "Viewer";
+}
+
+export interface AuditLog {
+  id: string;
+  adminName: string;
+  action: string;
+  target: string;
+  timestamp: string;
+}
+
 interface ServerState {
   queue: Array<{ id: string; profile: UserProfile; timestamp: number }>;
   matches: Map<string, MatchResult>;
@@ -10,6 +66,12 @@ interface ServerState {
     countriesCount: number;
     messagesSentCount: number;
   };
+  users: AdminUser[];
+  reports: UserReport[];
+  bans: BanRecord[];
+  keywords: KeywordFilter[];
+  admins: AdminAccount[];
+  auditLogs: AuditLog[];
 }
 
 // Global persistence across hot-rebuilds
@@ -25,6 +87,59 @@ const initialRooms: Room[] = [
   { id: "r5", name: "Tokyo City Pop Lounge", slug: "tokyo-city-pop-lounge", emoji: "🗼", description: "Late-night plastic love, high fidelity cassettes, neon highway loops, and future funk beats.", onlineCount: 63, tags: ["Vaporwave", "80s", "Vinyl"] },
 ];
 
+const initialUsers: AdminUser[] = [
+  { id: "usr_101", username: "NeonPhoenix 🌟", email: "phoenix@gmail.com", ip: "185.122.90.41", country: "United States", joinDate: "2026-02-12", totalSessions: 42, reportsReceived: 0, status: "active", banHistory: [] },
+  { id: "usr_102", username: "ShadowHacker 🕵️", email: "shadow@hushmail.com", ip: "103.41.22.99", country: "United Kingdom", joinDate: "2026-04-01", totalSessions: 112, reportsReceived: 5, status: "warned", banHistory: ["Muted 24h for spam"] },
+  { id: "usr_103", username: "CyberSpongeBob 🍍", email: "spongebob7278@gmail.com", ip: "192.168.1.104", country: "Bikini Bottom", joinDate: "2026-05-18", totalSessions: 290, reportsReceived: 1, status: "active", banHistory: [] },
+  { id: "usr_104", username: "AliceCrypto 🪙", email: "alice.coin@proton.me", ip: "82.49.112.5", country: "Canada", joinDate: "2026-01-20", totalSessions: 81, reportsReceived: 0, status: "active", banHistory: [] },
+  { id: "usr_105", username: "SaltySailor ⚓", email: "salty@ocean.net", ip: "45.11.201.88", country: "Netherlands", joinDate: "2026-03-30", totalSessions: 55, reportsReceived: 7, status: "warned", banHistory: ["Temporary limit applied 2026-05-01"] },
+  { id: "usr_106", username: "SpamBot99 🤖", email: "bot99@marketing.ru", ip: "91.24.18.232", country: "Russia", joinDate: "2026-05-02", totalSessions: 9, reportsReceived: 14, status: "muted", banHistory: ["Automatically muted due to keywords limit"] },
+  { id: "usr_107", username: "RudeClown 🤡", email: "clown@yahoo.com", ip: "119.55.10.15", country: "Australia", joinDate: "2026-05-15", totalSessions: 14, reportsReceived: 4, status: "banned", banHistory: ["Hard banned by Admin Ayush"] },
+  { id: "usr_108", username: "PixelArtis 🎨", email: "pixel@gmail.com", ip: "210.15.42.109", country: "Japan", joinDate: "2025-12-25", totalSessions: 178, reportsReceived: 0, status: "active", banHistory: [] }
+];
+
+const initialReports: UserReport[] = [
+  { 
+    id: "rep_201", 
+    reportedUserId: "usr_102", 
+    reportedUsername: "ShadowHacker 🕵️", 
+    reporterName: "AliceCrypto 🪙", 
+    reason: "Sent malicious phishing URL containing credentials harvester", 
+    status: "pending", 
+    timestamp: "2026-06-06T08:12:15Z",
+    chatTranscript: [
+      { sender: "AliceCrypto", text: "Hi! How is it going in Canada?" },
+      { sender: "ShadowHacker", text: "Go to this URL to receive free bitcoin right now!! https://rob-your-key-now.org/auth?id=49" },
+      { sender: "AliceCrypto", text: "Err, that looks like a severe protocol threat scam link..." }
+    ]
+  }
+];
+
+const initialBans: BanRecord[] = [
+  { id: "ban_1", userId: "usr_107", reason: "Repeated violations of anti-harassment terms during matching sessions", adminName: "Ayush", expiryDate: "Permanent" }
+];
+
+const initialKeywords: KeywordFilter[] = [
+  { id: "kw_1", phrase: "whatsapp me on", isRegex: false, action: "warn", triggersCount: 18 },
+  { id: "kw_2", phrase: "free bitcoin key", isRegex: false, action: "ban", triggersCount: 31 },
+  { id: "kw_3", phrase: "hack_tool_[0-9]", isRegex: true, action: "mute", triggersCount: 4 },
+  { id: "kw_4", phrase: "paypal.me/scam", isRegex: false, action: "ban", triggersCount: 12 }
+];
+
+const initialAdmins: AdminAccount[] = [
+  { id: "adm_1", name: "Ayush", email: "ayush@fluxmeet.org", role: "Super Admin" },
+  { id: "adm_2", name: "SpongeBob SquarePants", email: "spongebob7278@gmail.com", role: "Moderator" },
+  { id: "adm_3", name: "Sandy Cheeks", email: "sandy.cheeks@gmail.com", role: "Super Admin" },
+  { id: "adm_4", name: "Patrick Star", email: "patrick.star@gmail.com", role: "Viewer" }
+];
+
+const initialAuditLogs: AuditLog[] = [
+  { id: "log_1", adminName: "Ayush", action: "HARD_BAN_USER", target: "usr_107 (RudeClown)", timestamp: "2026-06-06T02:11:00Z" },
+  { id: "log_2", adminName: "Sandy Cheeks", action: "ADD_KEYWORD_FILTER", target: "'whatsapp me on'", timestamp: "2026-06-05T19:50:00Z" },
+  { id: "log_3", adminName: "Ayush", action: "IP_RANGE_BAN", target: "112.90.*.*", timestamp: "2026-06-05T14:22:00Z" },
+  { id: "log_4", adminName: "SpongeBob", action: "MUTED_USER", target: "usr_106 (SpamBot99)", timestamp: "2026-06-04T22:05:00Z" }
+];
+
 export const serverState: ServerState = globalForStore.serverState || {
   queue: [],
   matches: new Map(),
@@ -35,69 +150,58 @@ export const serverState: ServerState = globalForStore.serverState || {
     countriesCount: 114,
     messagesSentCount: 24890,
   },
+  users: initialUsers,
+  reports: initialReports,
+  bans: initialBans,
+  keywords: initialKeywords,
+  admins: initialAdmins,
+  auditLogs: initialAuditLogs,
 };
 
 if (!globalForStore.serverState) {
   globalForStore.serverState = serverState;
 }
 
-// Simulated Bot database for high fidelity instant matchmaking
-const botPartners = [
-  { username: "@cryptocat", displayName: "CryptoCat 💻", country: "🇩🇪 Germany", bio: "Rust hacker. Obsessed with distributed ledgers and mechanical keyboard layouts.", rating: 4.95, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" },
-  { username: "@neon_driver", displayName: "NeonDriver 🚗", country: "🇯🇵 Japan", bio: "City pop enthusiast. Retro arcade restorer. I drive at midnight for the views.", rating: 4.88, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" },
-  { username: "@pixel_mandal", displayName: "PixelMandal 🎨", country: "🇮🇳 India", bio: "Weaving complex bento grids & generating isometric UI vectors to relax.", rating: 4.82, avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" },
-  { username: "@sol_hack", displayName: "Sol Hack 🪐", country: "🇧🇷 Brazil", bio: "Synthesizer collector and UX specialist. Currently building ambient loops.", rating: 4.91, avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" },
-  { username: "@aurora", displayName: "Aurora Borealis 🧊", country: "🇨🇦 Canada", bio: "Glacier survey tech. Coding in thermo-suits under northern lights. Cozy vibes.", rating: 4.97, avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150" }
-];
 
-const botResponses: Record<string, string[]> = {
-  default: [
-    "Hey! Fascinating connection protocol here. What are you building today?",
-    "Agreed. Standard networks are so bloated. Love the slate-cyan console flow here of Flux Meet.",
-    "Interesting! Tell me more about that setup.",
-    "That makes complete sense. I usually configure my container reverse proxies to cache those payloads directly.",
-    "Wow, neat! Totally checking that out on my local machine shortly.",
-    "Haha, same! Half my scripts are held together by regex and midnight coffee.",
-    "Nice talking to you! The verified handshake filter on Flux is super solid."
-  ],
-  "@cryptocat": [
-    "Hey! Handshake secure. I was just compiling some Rust WASM binaries, what's up?",
-    "Nice! I use a 60% mechanical layout with custom linear switches. Sound signature is pristine.",
-    "Honestly, keeping secrets hidden server-side is rule #1. Flux has premium encryption filters.",
-    "Nice chat! Catch you in the Cybersecurity room later."
-  ],
-  "@neon_driver": [
-    "Yo! Just listening to Tatsuro Yamashita. Do you vibe with midnight cassettes too?",
-    "Wow, perfect midnight cruising soundtracks. Makes compiling styles feel breezy.",
-    "Tokyo nights are pretty bright right now, looking out of a cozy arcade lounge.",
-    "Keep driving! Catch you around."
-  ],
-  "@pixel_mandal": [
-    "Hello there! I'm wireframing a neon custom bento dashboard right now. What are you designing?",
-    "Padding and custom shadows make or break a viewport. Zero placeholders is my law.",
-    "Yes, generous negative space paired with deep Slate background is highly professional.",
-    "Have an amazing day! Talk soon."
-  ],
-};
-
-// Helper methods
+// Helper methods representing 100% real-time synchronized data
 export function getStats() {
-  // Fluctuating stats for living UI
-  const drift = Math.floor(Math.random() * 5) - 2; // -2 to +2
-  serverState.stats.onlineUsers = Math.max(1200, serverState.stats.onlineUsers + drift);
-  serverState.stats.messagesSentCount += Math.floor(Math.random() * 3);
-  return serverState.stats;
+  const activeMatches = Array.from(serverState.matches.values()).filter(m => m.status === "matched");
+  const uniqueUsers = new Set<string>();
+  const countries = new Set<string>();
+
+  // Collect from queue
+  serverState.queue.forEach(item => {
+    uniqueUsers.add(item.id);
+    if (item.profile.country) {
+      countries.add(item.profile.country);
+    }
+  });
+
+  // Collect from active matches
+  activeMatches.forEach(m => {
+    uniqueUsers.add(m.partner.id);
+    if (m.partner.country) {
+      countries.add(m.partner.country);
+    }
+  });
+
+  // Count total real messages
+  let totalMessages = 0;
+  serverState.matches.forEach(m => {
+    totalMessages += m.messages.filter(msg => !msg.isSystem).length;
+  });
+
+  return {
+    onlineUsers: Math.max(1, uniqueUsers.size + 1), // Real live active count + self
+    chatsToday: serverState.matches.size / 2, // Divided by 2 since reciprocal matches are created
+    countriesCount: Math.max(1, countries.size),
+    messagesSentCount: Math.max(0, totalMessages),
+  };
 }
 
 export function getRooms() {
-  // Add small virtual variation to active users
-  return serverState.rooms.map(room => {
-    const change = Math.floor(Math.random() * 3) - 1; // -1 to +1
-    return {
-      ...room,
-      onlineCount: Math.max(10, room.onlineCount + change)
-    };
-  });
+  // Return rooms with actual active users (if any) or real session connections
+  return serverState.rooms;
 }
 
 export function addToQueue(userId: string, profile: UserProfile) {
@@ -151,38 +255,6 @@ export function addMessageToMatch(matchId: string, senderId: string, senderName:
 
     match.messages.push(msg);
     match.lastActiveTime = Date.now();
-    serverState.stats.messagesSentCount += 1;
-
-    // Simulate bot replying after a short natural delay
-    if (match.partner.id.startsWith("bot_")) {
-      // Start bot typing after 400ms
-      setTimeout(() => {
-        setTypingStatus(matchId, match.partner.id, true);
-      }, 400);
-
-      setTimeout(() => {
-        const botMatch = serverState.matches.get(matchId);
-        if (botMatch && botMatch.status === "matched") {
-          // Set bot typing back to false when they reply
-          setTypingStatus(matchId, botMatch.partner.id, false);
-          
-          const usernameKey = botMatch.partner.username;
-          const replies = botResponses[usernameKey] || botResponses.default;
-          // select reply based on index/random
-          const replyText = replies[Math.floor(Math.random() * replies.length)];
-          const botMsg: Message = {
-            id: `m_${Math.random().toString(36).substr(2, 9)}`,
-            senderId: botMatch.partner.id,
-            senderName: botMatch.partner.displayName,
-            text: replyText,
-            timestamp: Date.now(),
-          };
-          botMatch.messages.push(botMsg);
-          botMatch.lastActiveTime = Date.now();
-          serverState.stats.messagesSentCount += 1;
-        }
-      }, 1800);
-    }
   }
 
   return msg;
@@ -198,9 +270,8 @@ export function endMatch(matchId: string, endedByUserId: string) {
   }
 }
 
-// Matchmaking algorithm
+// Matchmaking algorithm for pure real-time peer matching
 function processMatchmaking() {
-  // Match real users together first
   if (serverState.queue.length >= 2) {
     const userA = serverState.queue.shift()!;
     const userB = serverState.queue.shift()!;
@@ -246,78 +317,6 @@ function processMatchmaking() {
       lastActiveTime: Date.now(),
     };
     serverState.matches.set(matchRecipId, matchRecip);
-
     serverState.stats.chatsToday += 1;
-    return;
-  }
-
-  // If a user has been waiting for more than 2.5 seconds, match space-time with a simulated verified system bot Partner!
-  const now = Date.now();
-  for (let i = 0; i < serverState.queue.length; i++) {
-    const candidate = serverState.queue[i];
-    if (now - candidate.timestamp > 2000) {
-      serverState.queue.splice(i, 1);
-      
-      // Select a random bot
-      const randomBot = botPartners[Math.floor(Math.random() * botPartners.length)];
-      const botId = `bot_${Math.random().toString(36).substr(2, 5)}`;
-      const matchId = `match_${candidate.id}_${botId}`;
-
-      const match: MatchResult = {
-        id: matchId,
-        status: "matched",
-        partner: {
-          id: botId,
-          username: randomBot.username,
-          displayName: randomBot.displayName,
-          avatar: randomBot.avatar,
-          country: randomBot.country,
-          rating: randomBot.rating,
-        },
-        messages: [
-          { id: `sys_init`, senderId: "system", senderName: "System", text: `🔒 Encrypted tunneling established. Authenticated with verified partner ${randomBot.displayName}.`, timestamp: Date.now(), isSystem: true }
-        ],
-        createdTime: Date.now(),
-        lastActiveTime: Date.now(),
-      };
-
-      serverState.matches.set(matchId, match);
-      serverState.stats.chatsToday += 1;
-      
-      // Start bot typing after 100ms
-      setTimeout(() => {
-        setTypingStatus(matchId, botId, true);
-      }, 100);
-
-      // Seed first bot message shortly
-      setTimeout(() => {
-        const activeMatch = serverState.matches.get(matchId);
-        if (activeMatch && activeMatch.status === "matched") {
-          // Set bot typing back to false when they reply
-          setTypingStatus(matchId, botId, false);
-
-          const greetText = randomBot.username === "@cryptocat" 
-            ? "Hey! Secure handshake complete. Rust hacking tonight? 🦀"
-            : randomBot.username === "@neon_driver"
-            ? "Yo! Just tuning into some late night Tokyo city pop cassettes. Vibes? 🗼"
-            : randomBot.username === "@pixel_mandal"
-            ? "Hey! Designing neon panels. Your profile display looks awesome! 🎨"
-            : "Hey there! Handshake verified. Connecting from icy Canada Survey station. What are you coding today? 🧊";
-
-          const greetMsg: Message = {
-            id: `m_${Math.random().toString(36).substr(2, 9)}`,
-            senderId: botId,
-            senderName: randomBot.displayName,
-            text: greetText,
-            timestamp: Date.now(),
-          };
-          activeMatch.messages.push(greetMsg);
-          activeMatch.lastActiveTime = Date.now();
-          serverState.stats.messagesSentCount += 1;
-        }
-      }, 1000);
-
-      break;
-    }
   }
 }

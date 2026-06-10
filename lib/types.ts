@@ -12,6 +12,7 @@ export interface UserProfile {
   messagesCount: number;
   friendsCount: number;
   rating: number;
+  status?: "active" | "warned" | "muted" | "banned";
 }
 
 export interface Friend {

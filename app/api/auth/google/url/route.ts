@@ -4,7 +4,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const { searchParams } = new URL(req.url);
+    const customClientId = searchParams.get("clientId");
+    const customClientSecret = searchParams.get("clientSecret");
+
+    const clientId = customClientId || process.env.GOOGLE_CLIENT_ID;
     
     // Determine redirect URI
     // Use NEXT_PUBLIC_APP_URL, APP_URL, or fall back to request header host
@@ -21,6 +25,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Google OAuth 2.0 authorization endpoint
+    let statePayload = "flux_meet_oauth_state";
+    if (customClientId || customClientSecret) {
+      statePayload = Buffer.from(JSON.stringify({
+        c_id: customClientId || "",
+        c_secret: customClientSecret || "",
+        ts: Date.now()
+      })).toString("base64url");
+    }
+
     const urlParams = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -28,7 +41,7 @@ export async function GET(req: NextRequest) {
       scope: "openid profile email",
       access_type: "offline",
       prompt: "consent",
-      state: "flux_meet_oauth_state" // Simple tracking state
+      state: statePayload
     });
 
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${urlParams.toString()}`;

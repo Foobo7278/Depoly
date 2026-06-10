@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const state = searchParams.get("state");
 
   let userData = {
     id: "g_" + Math.random().toString(36).substr(2, 9),
@@ -32,8 +33,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    let clientId = process.env.GOOGLE_CLIENT_ID;
+    let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (state && state !== "flux_meet_oauth_state") {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+        if (decoded.c_id) clientId = decoded.c_id;
+        if (decoded.c_secret) clientSecret = decoded.c_secret;
+      } catch (err) {
+        console.warn("Failed to decode custom callback state:", err);
+      }
+    }
+
     const origin = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || req.nextUrl.origin;
     const redirectUri = `${origin}/api/auth/google/callback`;
 

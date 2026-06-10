@@ -68,13 +68,13 @@ export default function RoomsView({
 
     if (selectedRoom.id === "r1") {
       seedMessages.push(
-        { id: "sm_2", senderId: "u_rust_h", senderName: "Rust_Hacker 🦀", text: "Are you guys checking those secure container proxies? Vite proxy was misrouting websocket handshakes.", timestamp: Date.now() - 30000 },
-        { id: "sm_3", senderId: "u_sec_dev", senderName: "SecDev_Omega 🛡️", text: "Yeah, default nginx block on port 3000 solved it. All assets must pass local server proxies.", timestamp: Date.now() - 15000 }
+        { id: "sm_2", senderId: "u_rust_h", senderName: "SafetyFirst 🦀", text: "Always double-check link origins! Sophisticated authentication phishing happens so easily nowadays.", timestamp: Date.now() - 30000 },
+        { id: "sm_3", senderId: "u_sec_dev", senderName: "ShieldOmega 🛡️", text: "Agreed! Two-factor keys and passkeys are my default recommendation now. Complete peace of mind.", timestamp: Date.now() - 15000 }
       );
     } else if (selectedRoom.id === "r2") {
       seedMessages.push(
-        { id: "sm_2", senderId: "u_ai_e", senderName: "AgentMaker 🤖", text: "Checking model weight drift on Gemini 1.5 flash vs 2.0. Proposing strict system bounds.", timestamp: Date.now() - 32000 },
-        { id: "sm_3", senderId: "u_prom", senderName: "PromptArchitect 🧠", text: "Yes! System directives act as the absolute design ceiling. Always check for unrequested over-engineering.", timestamp: Date.now() - 17000 }
+        { id: "sm_2", senderId: "u_ai_e", senderName: "CreativeSeeker 🤖", text: "Asked an AI helper to compile holiday itinerary guides for Kyoto. The travel draft looks so incredibly beautiful!", timestamp: Date.now() - 32000 },
+        { id: "sm_3", senderId: "u_prom", senderName: "PromptArchitect 🧠", text: "Oh lovely! I use it to draft quick summaries or brainstorm healthy weekly dinner ideas.", timestamp: Date.now() - 17000 }
       );
     } else if (selectedRoom.id === "r3") {
       seedMessages.push(
@@ -93,9 +93,9 @@ export default function RoomsView({
     const liveSimulationInterval = setInterval(() => {
       // Pick random simulated user
       const testParticipants = [
-        { name: "SymmetricHacker 🔐", id: "sim_p1", msgs: ["Totally agree with that. The layout is highly pristine.", "Caching active headers on memory avoids infinite loops.", "Anyone building NextJS layouts tonight?"] },
-        { name: "ByteCrutus 🛸", id: "sim_p2", msgs: ["What's the handshake delay right now? Feeling instant.", "Awesome. The telemetry graphs look stellar.", "Using standard tailwind utility classes keep code footprint tiny."] },
-        { name: "CassetteLover 📼", id: "sim_p3", msgs: ["Perfect midnight cassettes playing.", "Ambient drift is perfect.", "Always inspect manifest files first."] },
+        { name: "SymmetricHacker 🔐", id: "sim_p1", msgs: ["Totally agree with that. The layout is highly pristine.", "Caching active headers on memory is super fast.", "Anyone building new layout setups tonight?"] },
+        { name: "AstroVibe 🌠", id: "sim_p2", msgs: ["How is the reaction speed? Feeling practically instantaneous.", "Awesome. The micro-animations look stellar.", "Using standard Tailwind classes makes customization so easy."] },
+        { name: "CassetteLover 📼", id: "sim_p3", msgs: ["Perfect midnight cassettes playing.", "Ambient drift is perfect.", "Always inspect visual alignments."] },
       ];
 
       const participant = testParticipants[Math.floor(Math.random() * testParticipants.length)];
@@ -151,20 +151,20 @@ export default function RoomsView({
     setTimeout(() => {
       if (!selectedRoom) return;
       const responsePool = [
-        "Symmetric response received.",
-        "Excellent point! Let's examine the server store for that.",
-        "Interesting observation. Keep transmitting logs.",
-        "That balances perfectly with other console telemetry values."
+        "That sounds wonderful.",
+        "Excellent point! Let's build on that together.",
+        "Interesting observation. Tell me more!",
+        "That is in complete harmony with what I've experienced."
       ];
       const botMsg: Message = {
         id: `rm_sim_usr_reply_${Date.now()}`,
         senderId: "sim_room_bot",
-        senderName: "Verifier bot 🤖",
+        senderName: "Chat Companion 💬",
         text: responsePool[Math.floor(Math.random() * responsePool.length)],
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, botMsg]);
-    }, 1800);
+    }, 1850);
   };
 
   return (
